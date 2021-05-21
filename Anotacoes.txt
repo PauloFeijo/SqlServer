@@ -1,0 +1,130 @@
+DML Data Manipulation Language    (SELECT, INSERT, UPDATE, DELETE)
+DDL Data Definition Language      (CREATE, ALTER, DROP, TRUNCATE)
+DCL Data Control Language         (GRANT, REVOKE, DENY)
+TCL Transaction Control Language  (BEGIN TRANSACTION, COMMIT, ROLLBACK, SAVE TRANSACTION, ROLLBACK TRANSACTION)
+
+
+-- criando uma tabela
+create table tabela (
+   id int identity(1,1) primary key not null,
+   nome varchar(100)
+);
+
+-- insert
+insert into tabela (nome) values ('eu')
+
+select * from tabela
+
+-- x primeiros registros
+select top 5 * from tabela
+
+-- funções de classificação
+select row_number() over (order by regiao asc) as row_number_uf,
+       dense_rank() over (order by regiao asc) as dense_rank_uf,
+       ntile(5) over (order by regiao asc) as ntile_uf,
+       rank() over (order by regiao asc) as rank_uf,
+       regiao, estado
+ from regiao
+order by 5,6
+
+--Escolha
+select choose (3, 'um', 'dois', 'tres') as numero
+
+--Numero aleatorio
+select rand(), cast(rand()*10 as int), rand()*100
+select round(1.5, 0)
+
+--Conversões
+select cast(4.5 as int)
+select convert(int, 4.5)
+
+--Nulos
+select nullif(1,0), nullif(0,0), nullif(0,null)
+select isnull(null,0), isnull(0,0), isnull(0,null), isnull(null,null)
+
+declare @a int = 2
+select cast(isnull(1 / nullif(@a,0), 0) as decimal(5,2))
+
+select coalesce(null, null, null, 'quatro', null)
+
+
+-- while
+declare @qtd int = 0;
+begin
+   while @qtd < 10
+   begin
+      select 1
+	  set @qtd = @qtd +1
+   end
+end;
+
+-- cursor
+declare @estado varchar(100)
+declare meucursor cursor local for select estado from [dbo].[regiao]
+open meucursor
+fetch next from meucursor into @estado
+while (@@FETCH_STATUS = 0)
+begin
+   print concat(@estado, ' status: ', @@FETCH_STATUS)
+   fetch next from meucursor into @estado
+end
+print concat(@estado, ' status: ', @@FETCH_STATUS)
+close meucursor
+deallocate meucursor
+
+-- tabela temporária
+create table ##dados
+(
+   id int,
+   nome varchar(20)
+)
+select * from ##dados
+
+-- função escalar
+create or alter function LRTrim(@entrada varchar(1000)) returns varchar(1000)
+begin
+   return ltrim(rtrim(@entrada))
+end;
+go
+select dbo.LRTrim('     paulo     ')
+
+-- função valor de tabela
+create or alter function function_table(@entrada varchar(100), @qtd int)
+returns @tabela table(id int, nome varchar(100)) as
+begin
+   declare @i int = 1;
+   while @i < @qtd
+   begin
+      insert into @tabela (id, nome) values (@i, concat(@entrada, @i));
+      set @i = @i +1;
+   end
+   return
+end;
+go
+select * from function_table('paulo', 100);
+
+-- função tabela inline
+create or alter function function_table_inline(@uf varchar(2))
+returns table as
+return ( select * from dbo.senso where uf = @uf)
+go
+select * from function_table_inline('PR')
+
+-- procedure
+create or alter procedure quadrado @n int as
+begin
+   select @n*@n as quadrado
+end;
+go
+exec quadrado 5;
+
+--trigger
+create or alter trigger TG_aud_tabela
+on tabela after UPDATE as
+begin
+   insert into tabela_hist (id_tabela, nome, data, usuario)
+   values (
+      (select id from inserted),
+      (select nome from deleted),
+      getdate(), SYSTEM_USER)
+end
